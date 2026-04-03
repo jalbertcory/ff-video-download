@@ -29,16 +29,9 @@ This project is licensed under the `0BSD` license, which is about as permissive 
 
 1. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
-3. Choose `/Users/jalbertcory/Documents/code/ff-video-download/manifest.json`
+3. Choose `{repo-directory}/ff-video-download/manifest.json`
 4. Visit a page with an embedded MP4 player
 5. Click the extension button and press **Download**
-
-## Project files
-
-- `manifest.json`: Firefox extension manifest
-- `background.js`: tracks MP4 network requests and handles downloads
-- `content-script.js`: scans the page for direct MP4 URLs
-- `popup.html`, `popup.css`, `popup.js`: popup UI
 
 ## Next ideas
 
