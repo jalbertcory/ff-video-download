@@ -10,7 +10,11 @@ Firefox extension for grabbing direct embedded media URLs from ordinary web page
 
 ## License
 
-This project is licensed under the `0BSD` license, which is about as permissive as it gets for software reuse.
+The original extension code in this repo is licensed under `0BSD`.
+
+This repo also vendors `mux.js` in [vendor/mux-mp4.js](/Users/jalbertcory/Documents/code/ff-video-download/vendor/mux-mp4.js), which is licensed under `Apache-2.0`. That means the repository is a mixed-license distribution rather than a pure `0BSD` codebase.
+
+See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THIRD_PARTY_NOTICES.md](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_NOTICES.md), and [THIRD_PARTY_LICENSES/Apache-2.0.txt](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_LICENSES/Apache-2.0.txt).
 
 ## What it does
 
