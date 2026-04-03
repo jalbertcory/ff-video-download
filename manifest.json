@@ -14,7 +14,12 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "background.js"
+    ],
+    "preferred_environment": [
+      "document"
+    ]
   },
   "action": {
     "default_title": "Embedded MP4 Grabber",
