@@ -4,7 +4,7 @@
 [![Firefox](https://img.shields.io/badge/browser-Firefox-f08a24.svg)](https://www.mozilla.org/firefox/)
 [![Manifest V3](https://img.shields.io/badge/webextension-MV3-1d2433.svg)](https://developer.mozilla.org/docs/Mozilla/Add-ons/WebExtensions)
 
-A small Firefox extension that finds direct `.mp4` video files and HLS `.m3u8` playlists on the current page so you can download MP4s or open stream URLs in VLC.
+A small Firefox extension that finds direct `.mp4` video files and HLS `.m3u8` playlists on the current page so you can download MP4s, export VLC helpers, or try simple HLS merges.
 
 Firefox extension for grabbing direct embedded media URLs from ordinary web pages so you can watch them in a desktop player instead of a cramped browser video widget.
 
@@ -19,13 +19,15 @@ This project is licensed under the `0BSD` license, which is about as permissive 
 - Watches real network responses for MP4 files and HLS playlists, which helps when a custom player hides the URL in the DOM.
 - Shows everything it found in the toolbar popup.
 - Downloads direct MP4 files one at a time or all at once.
-- Copies HLS stream URLs so you can paste a playlist directly into VLC with `Media -> Open Network Stream`.
+- Saves a small VLC helper `.m3u` file for HLS streams.
+- Exports an `ffmpeg` command for HLS URLs, including cookies from the browser when available.
+- Attempts a basic in-extension HLS merge for simple non-DRM MPEG-TS playlists, producing a `.ts` file.
 
 ## What it does not do
 
 - It only targets direct MP4 files and HLS playlist URLs.
 - It does not turn HLS playlists into MP4 files inside Firefox.
-- Downloading an HLS entry directly only gets the tiny playlist text file, not the whole video, so the extension intentionally treats HLS as copy/open-in-VLC instead.
+- The built-in HLS merge only supports straightforward non-DRM MPEG-TS segment playlists. It does not support encrypted HLS, byte-range playlists, or fMP4-style HLS with `#EXT-X-MAP`.
 - It does not handle DRM, encrypted streams, `blob:` URLs themselves, or DASH (`.mpd`) manifests.
 - It is intentionally not built for large streaming sites or site-specific extraction logic.
 

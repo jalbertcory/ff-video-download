@@ -92,6 +92,10 @@ h1 {
   transform: none;
 }
 
+.button.is-hidden {
+  display: none;
+}
+
 .button.primary {
   background: var(--primary);
   color: #f6f4ef;
@@ -157,4 +161,5 @@ h1 {
 .item-actions {
   display: grid;
   gap: 8px;
+  min-width: 150px;
 }

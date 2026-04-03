@@ -11,6 +11,10 @@ function isHls(item) {
   return item.mediaType === "hls"
 }
 
+function isMp4(item) {
+  return item.mediaType === "mp4"
+}
+
 function truncateUrl(url) {
   if (url.length <= 110) {
     return url
@@ -135,7 +139,8 @@ function renderMedia() {
     const kindEl = fragment.querySelector(".kind")
     const urlEl = fragment.querySelector(".url")
     const metaEl = fragment.querySelector(".meta")
-    const copyButtonEl = fragment.querySelector(".copy-one")
+    const helperButtonEl = fragment.querySelector(".helper-one")
+    const commandButtonEl = fragment.querySelector(".command-one")
     const buttonEl = fragment.querySelector(".download-one")
 
     filenameEl.textContent = item.filename
@@ -143,40 +148,71 @@ function renderMedia() {
     urlEl.textContent = truncateUrl(item.url)
     urlEl.title = item.url
     metaEl.textContent = describeSources(item)
-    copyButtonEl.textContent = isHls(item) ? "Copy for VLC" : "Copy URL"
-    buttonEl.textContent = isHls(item) ? "Use Copy for VLC" : "Download MP4"
-    buttonEl.disabled = isHls(item)
-    buttonEl.title = isHls(item) ? "HLS streams are playlists, not single MP4 files." : ""
+    helperButtonEl.textContent = isHls(item) ? "Save VLC Helper" : "Copy URL"
+    commandButtonEl.classList.toggle("is-hidden", isMp4(item))
+    buttonEl.textContent = isHls(item) ? "Try HLS Merge" : "Download MP4"
+    buttonEl.title = isHls(item)
+      ? "Downloads simple non-DRM MPEG-TS HLS streams into one .ts file when possible."
+      : ""
 
-    copyButtonEl.addEventListener("click", async () => {
-      copyButtonEl.disabled = true
+    helperButtonEl.addEventListener("click", async () => {
+      helperButtonEl.disabled = true
       try {
-        await copyText(item.url)
-        setStatus(isHls(item) ? "Copied HLS playlist URL for VLC." : "Copied media URL.")
+        if (isHls(item)) {
+          const response = await browser.runtime.sendMessage({
+            type: "save-vlc-helper",
+            item
+          })
+          setStatus(`Saved VLC helper playlist as ${response.filename}.`)
+        } else {
+          await copyText(item.url)
+          setStatus("Copied media URL.")
+        }
       } catch (error) {
-        setStatus(`Copy failed: ${error.message || "unknown error"}`)
+        setStatus(`Helper action failed: ${error.message || "unknown error"}`)
       } finally {
-        copyButtonEl.disabled = false
+        helperButtonEl.disabled = false
+      }
+    })
+
+    commandButtonEl.addEventListener("click", async () => {
+      commandButtonEl.disabled = true
+      try {
+        const response = await browser.runtime.sendMessage({
+          type: "build-ffmpeg-command",
+          item
+        })
+        await copyText(response.command)
+        setStatus("Copied ffmpeg command.")
+      } catch (error) {
+        setStatus(`ffmpeg export failed: ${error.message || "unknown error"}`)
+      } finally {
+        commandButtonEl.disabled = false
       }
     })
 
     buttonEl.addEventListener("click", async () => {
-      if (isHls(item)) {
-        setStatus("HLS streams should be copied into VLC instead of downloaded as a single file.")
-        return
-      }
-
       buttonEl.disabled = true
-      setStatus(`Downloading ${item.filename}…`)
+      setStatus(isHls(item) ? `Attempting HLS merge for ${item.filename}…` : `Downloading ${item.filename}…`)
 
       try {
-        await browser.runtime.sendMessage({
-          type: "download-media",
-          url: item.url,
-          filename: item.filename,
-          mediaType: item.mediaType
-        })
-        setStatus(`Started download for ${item.filename}.`)
+        if (isHls(item)) {
+          const response = await browser.runtime.sendMessage({
+            type: "download-media",
+            mediaType: item.mediaType,
+            item
+          })
+          setStatus(`Merged ${response.segmentCount} HLS segment${response.segmentCount === 1 ? "" : "s"} into ${response.filename}.`)
+        } else {
+          await browser.runtime.sendMessage({
+            type: "download-media",
+            url: item.url,
+            filename: item.filename,
+            mediaType: item.mediaType,
+            item
+          })
+          setStatus(`Started download for ${item.filename}.`)
+        }
       } catch (error) {
         setStatus(`Download failed: ${error.message || "unknown error"}`)
       } finally {
