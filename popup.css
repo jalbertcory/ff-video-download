@@ -53,6 +53,7 @@ h1 {
 
 .subtle,
 .name-label,
+.download-indicator,
 .kind,
 .meta,
 .url,
@@ -160,6 +161,7 @@ h1 {
 }
 
 .name-label,
+.download-indicator,
 .kind,
 .url,
 .meta {
@@ -215,6 +217,28 @@ h1 {
   color: var(--primary);
   font-size: 12px;
   font-weight: 700;
+}
+
+.download-indicator {
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+.download-indicator.is-idle {
+  display: none;
+}
+
+.download-indicator.is-preparing,
+.download-indicator.is-downloading {
+  color: #946200;
+}
+
+.download-indicator.is-completed {
+  color: var(--primary);
+}
+
+.download-indicator.is-failed {
+  color: #a23a2a;
 }
 
 .media-copy {

@@ -10,6 +10,8 @@ const MEDIA_TYPES = {
 const HLS_FETCH_CONCURRENCY = 6
 let mp4boxModulePromise = null
 const CONTEXT_MENU_ID = "download-best-detected-video"
+const mediaDownloadStateByKey = new Map()
+const downloadIdToMediaKey = new Map()
 
 function sanitizeFilename(rawName) {
   const cleaned = (rawName || "video.mp4")
@@ -162,6 +164,37 @@ function normalizeMediaItem(incoming, normalizedUrl) {
   }
 }
 
+function getMediaKey(item) {
+  return `${item.mediaType}:${item.url}`
+}
+
+function getDownloadState(item) {
+  return mediaDownloadStateByKey.get(getMediaKey(item)) || {
+    state: "idle"
+  }
+}
+
+function broadcastDownloadState(mediaKey, downloadState) {
+  browser.runtime.sendMessage({
+    type: "media-download-state-changed",
+    mediaKey,
+    downloadState
+  }).catch(() => {})
+}
+
+function setDownloadState(item, patch) {
+  const mediaKey = getMediaKey(item)
+  const nextState = {
+    ...(mediaDownloadStateByKey.get(mediaKey) || { state: "idle" }),
+    ...patch,
+    updatedAt: Date.now()
+  }
+
+  mediaDownloadStateByKey.set(mediaKey, nextState)
+  broadcastDownloadState(mediaKey, nextState)
+  return mediaKey
+}
+
 function upsertMedia(tabId, incoming) {
   if (typeof tabId !== "number" || !incoming?.url) {
     return
@@ -208,7 +241,10 @@ function clearTabMedia(tabId) {
 }
 
 function getMediaForTab(tabId) {
-  return (mediaByTab.get(tabId) || []).slice(0, 100)
+  return (mediaByTab.get(tabId) || []).slice(0, 100).map((item) => ({
+    ...item,
+    downloadState: getDownloadState(item)
+  }))
 }
 
 function suggestOutputName(item, tabTitle = "") {
@@ -296,13 +332,57 @@ async function downloadItem(item, tabTitle = "") {
   }
 
   if (downloadItemWithName.mediaType === MEDIA_TYPES.HLS) {
-    return downloadMergedHls(downloadItemWithName)
+    setDownloadState(downloadItemWithName, {
+      state: "preparing"
+    })
+
+    try {
+      const result = await downloadMergedHls(downloadItemWithName)
+      const mediaKey = setDownloadState(downloadItemWithName, {
+        state: "downloading",
+        filename: result.filename,
+        downloadId: result.downloadId
+      })
+      downloadIdToMediaKey.set(result.downloadId, mediaKey)
+      return result
+    } catch (error) {
+      setDownloadState(downloadItemWithName, {
+        state: "failed",
+        error: error.message || "Download failed"
+      })
+      throw error
+    }
   }
 
-  return downloadMedia(
-    downloadItemWithName.url,
-    withExtension(downloadItemWithName.outputName || downloadItemWithName.filename, "mp4")
-  )
+  const filename = withExtension(downloadItemWithName.outputName || downloadItemWithName.filename, "mp4")
+  setDownloadState(downloadItemWithName, {
+    state: "downloading",
+    filename
+  })
+
+  try {
+    const downloadId = await downloadMedia(
+      downloadItemWithName.url,
+      filename
+    )
+    const mediaKey = setDownloadState(downloadItemWithName, {
+      state: "downloading",
+      filename,
+      downloadId
+    })
+    downloadIdToMediaKey.set(downloadId, mediaKey)
+    return {
+      downloadId,
+      filename
+    }
+  } catch (error) {
+    setDownloadState(downloadItemWithName, {
+      state: "failed",
+      filename,
+      error: error.message || "Download failed"
+    })
+    throw error
+  }
 }
 
 async function handleContextMenuDownload(info, tab) {
@@ -860,6 +940,40 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
 
 browser.tabs.onRemoved.addListener((tabId) => {
   clearTabMedia(tabId)
+})
+
+browser.downloads.onChanged.addListener((delta) => {
+  const mediaKey = downloadIdToMediaKey.get(delta.id)
+  if (!mediaKey) {
+    return
+  }
+
+  const currentState = mediaDownloadStateByKey.get(mediaKey)
+  if (!currentState) {
+    return
+  }
+
+  if (delta.state?.current === "complete") {
+    const nextState = {
+      ...currentState,
+      state: "completed",
+      updatedAt: Date.now()
+    }
+    mediaDownloadStateByKey.set(mediaKey, nextState)
+    broadcastDownloadState(mediaKey, nextState)
+    return
+  }
+
+  if (delta.state?.current === "interrupted") {
+    const nextState = {
+      ...currentState,
+      state: "failed",
+      error: delta.error?.current || "Download interrupted",
+      updatedAt: Date.now()
+    }
+    mediaDownloadStateByKey.set(mediaKey, nextState)
+    broadcastDownloadState(mediaKey, nextState)
+  }
 })
 
 browser.runtime.onInstalled.addListener(() => {

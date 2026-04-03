@@ -10,6 +10,10 @@ let currentMedia = []
 let activeTabTitle = ""
 let hideDuplicateVariants = true
 
+function getMediaKey(item) {
+  return `${item.mediaType}:${item.url}`
+}
+
 function isHls(item) {
   return item.mediaType === "hls"
 }
@@ -257,6 +261,43 @@ function getOutputFilename(item, extension = "mp4") {
   return `${getChosenBaseName(item)}.${extension}`
 }
 
+function getDownloadIndicator(item) {
+  const state = item.downloadState?.state || "idle"
+
+  if (state === "preparing") {
+    return {
+      text: "Preparing download…",
+      className: "is-preparing"
+    }
+  }
+
+  if (state === "downloading") {
+    return {
+      text: "Downloading…",
+      className: "is-downloading"
+    }
+  }
+
+  if (state === "completed") {
+    return {
+      text: "Downloaded",
+      className: "is-completed"
+    }
+  }
+
+  if (state === "failed") {
+    return {
+      text: "Last download failed",
+      className: "is-failed"
+    }
+  }
+
+  return {
+    text: "",
+    className: "is-idle"
+  }
+}
+
 function truncateUrl(url) {
   if (url.length <= 110) {
     return url
@@ -398,6 +439,7 @@ function renderMedia() {
     const article = fragment.querySelector(".media-item")
     const nameInputEl = fragment.querySelector(".name-input")
     const nameExtensionEl = fragment.querySelector(".name-extension")
+    const downloadIndicatorEl = fragment.querySelector(".download-indicator")
     const filenameEl = fragment.querySelector(".filename")
     const kindEl = fragment.querySelector(".kind")
     const urlEl = fragment.querySelector(".url")
@@ -408,6 +450,9 @@ function renderMedia() {
 
     nameInputEl.value = item.outputName
     nameExtensionEl.textContent = getPrimaryExtension(item)
+    const indicator = getDownloadIndicator(item)
+    downloadIndicatorEl.textContent = indicator.text
+    downloadIndicatorEl.classList.add(indicator.className)
     filenameEl.textContent = `Detected source name: ${item.filename}`
     kindEl.textContent = describeKind(item)
     urlEl.textContent = truncateUrl(item.url)
@@ -477,6 +522,11 @@ function renderMedia() {
       setStatus(isHls(item) ? `Attempting MP4 remux for ${item.filename}…` : `Downloading ${item.filename}…`)
 
       try {
+        item.downloadState = {
+          state: isHls(item) ? "preparing" : "downloading"
+        }
+        renderMedia()
+
         if (isHls(item)) {
           const response = await browser.runtime.sendMessage({
             type: "download-media",
@@ -498,7 +548,11 @@ function renderMedia() {
           setStatus(`Started download for ${getOutputFilename(item)}.`)
         }
       } catch (error) {
+        item.downloadState = {
+          state: "failed"
+        }
         setStatus(`Download failed: ${error.message || "unknown error"}`)
+        renderMedia()
       } finally {
         buttonEl.disabled = false
       }
@@ -582,6 +636,21 @@ async function initializePopup() {
   await loadSettings()
   await loadMedia()
 }
+
+browser.runtime.onMessage.addListener((message) => {
+  if (message?.type !== "media-download-state-changed") {
+    return undefined
+  }
+
+  const item = currentMedia.find((entry) => getMediaKey(entry) === message.mediaKey)
+  if (!item) {
+    return undefined
+  }
+
+  item.downloadState = message.downloadState
+  renderMedia()
+  return undefined
+})
 
 initializePopup().catch((error) => {
   setStatus(`Unable to scan this tab: ${error.message || "unknown error"}`)
