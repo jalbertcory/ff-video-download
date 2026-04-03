@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Embedded MP4 Grabber</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="hero">
+        <p class="eyebrow">Firefox helper</p>
+        <h1>Embedded MP4 Grabber</h1>
+        <p class="subtle">Find direct `.mp4` files on this tab and send them to Downloads.</p>
+      </header>
+
+      <section class="actions">
+        <button id="refresh" class="button secondary" type="button">Refresh</button>
+        <button id="download-all" class="button primary" type="button">Download All</button>
+      </section>
+
+      <section id="status" class="status" aria-live="polite">Scanning this tab…</section>
+
+      <section id="media-list" class="media-list"></section>
+    </main>
+
+    <template id="media-item-template">
+      <article class="media-item">
+        <div class="media-copy">
+          <h2 class="filename"></h2>
+          <p class="url"></p>
+          <p class="meta"></p>
+        </div>
+        <button class="button primary download-one" type="button">Download</button>
+      </article>
+    </template>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

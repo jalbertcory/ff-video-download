@@ -1,0 +1,147 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f1e8;
+  --panel: rgba(255, 252, 246, 0.95);
+  --ink: #1d2433;
+  --muted: #5e6678;
+  --line: rgba(29, 36, 51, 0.12);
+  --primary: #17624a;
+  --primary-strong: #0f4f3b;
+  --secondary: #e7ded0;
+  --shadow: 0 20px 50px rgba(42, 36, 27, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 380px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top right, rgba(23, 98, 74, 0.2), transparent 38%),
+    linear-gradient(180deg, #fbf7ef 0%, var(--bg) 100%);
+  color: var(--ink);
+}
+
+.popup {
+  padding: 18px;
+}
+
+.hero {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  color: var(--primary);
+}
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.subtle,
+.meta,
+.url,
+.status {
+  color: var(--muted);
+}
+
+.subtle {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+
+.button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.button.primary {
+  background: var(--primary);
+  color: #f6f4ef;
+}
+
+.button.primary:hover {
+  background: var(--primary-strong);
+}
+
+.button.secondary {
+  background: var(--secondary);
+  color: var(--ink);
+}
+
+.status {
+  min-height: 22px;
+  margin: 8px 2px 14px;
+  font-size: 13px;
+}
+
+.media-list {
+  display: grid;
+  gap: 12px;
+}
+
+.media-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+}
+
+.filename {
+  margin: 0 0 6px;
+  font-size: 15px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.url,
+.meta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.media-copy {
+  min-width: 0;
+}

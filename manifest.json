@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Embedded MP4 Grabber",
+  "version": "0.1.0",
+  "description": "Find direct MP4 video files embedded on the current page and download them.",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "storage",
+    "tabs",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Embedded MP4 Grabber",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "embedded-mp4-grabber@example.local",
+      "strict_min_version": "121.0"
+    }
+  }
+}
