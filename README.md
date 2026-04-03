@@ -12,9 +12,14 @@ Firefox extension for grabbing direct embedded media URLs from ordinary web page
 
 The original extension code in this repo is licensed under `0BSD`.
 
-This repo also vendors `mux.js` in [vendor/mux-mp4.js](/Users/jalbertcory/Documents/code/ff-video-download/vendor/mux-mp4.js), which is licensed under `Apache-2.0`. That means the repository is a mixed-license distribution rather than a pure `0BSD` codebase.
+This repo also vendors:
 
-See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THIRD_PARTY_NOTICES.md](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_NOTICES.md), and [THIRD_PARTY_LICENSES/Apache-2.0.txt](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_LICENSES/Apache-2.0.txt).
+- `mux.js` in [vendor/mux-mp4.js](/Users/jalbertcory/Documents/code/ff-video-download/vendor/mux-mp4.js), licensed under `Apache-2.0`
+- `mp4box` in [vendor/mp4box.all.js](/Users/jalbertcory/Documents/code/ff-video-download/vendor/mp4box.all.js), licensed under `BSD-3-Clause`
+
+That means the repository is a mixed-license distribution rather than a pure `0BSD` codebase.
+
+See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THIRD_PARTY_NOTICES.md](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_NOTICES.md), [THIRD_PARTY_LICENSES/Apache-2.0.txt](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_LICENSES/Apache-2.0.txt), and [THIRD_PARTY_LICENSES/BSD-3-Clause.txt](/Users/jalbertcory/Documents/code/ff-video-download/THIRD_PARTY_LICENSES/BSD-3-Clause.txt).
 
 ## What it does
 
@@ -25,7 +30,7 @@ See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THI
 - Downloads direct MP4 files one at a time or all at once.
 - Saves a small VLC helper `.m3u` file for HLS streams.
 - Exports an `ffmpeg` command for HLS URLs, including cookies from the browser when available.
-- Attempts a basic in-extension HLS remux for simple non-DRM MPEG-TS playlists, producing an MP4 download without re-encoding.
+- Attempts a basic in-extension HLS remux for simple non-DRM MPEG-TS playlists, then flattens the fragmented MP4 into a more player-friendly final MP4 without re-encoding.
 
 ## What it does not do
 

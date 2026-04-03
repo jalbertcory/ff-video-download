@@ -8,6 +8,7 @@ const MEDIA_TYPES = {
 }
 
 const HLS_FETCH_CONCURRENCY = 6
+let mp4boxModulePromise = null
 
 function sanitizeFilename(rawName) {
   const cleaned = (rawName || "video.mp4")
@@ -432,6 +433,14 @@ function concatUint8Arrays(parts) {
   return combined
 }
 
+async function loadMp4BoxModule() {
+  if (!mp4boxModulePromise) {
+    mp4boxModulePromise = import(browser.runtime.getURL("vendor/mp4box.all.js"))
+  }
+
+  return mp4boxModulePromise
+}
+
 function transmuxTsPartsToMp4(parts) {
   return new Promise((resolve, reject) => {
     if (!globalThis.muxjs?.Transmuxer) {
@@ -475,11 +484,122 @@ function transmuxTsPartsToMp4(parts) {
   })
 }
 
+function normalizeLanguage(language) {
+  return typeof language === "string" && language.length >= 3 ? language.slice(0, 3) : "und"
+}
+
+function cloneDescriptionBoxes(entry) {
+  return (entry.boxes || []).map((box) => box)
+}
+
+async function flattenFragmentedMp4(mp4Bytes) {
+  const MP4Box = await loadMp4BoxModule()
+
+  return new Promise((resolve, reject) => {
+    const inputFile = MP4Box.createFile()
+    const outputFile = MP4Box.createFile()
+    const trackMap = new Map()
+    let finalized = false
+
+    function fail(error) {
+      if (!finalized) {
+        finalized = true
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+
+    function succeed(buffer) {
+      if (!finalized) {
+        finalized = true
+        resolve(buffer)
+      }
+    }
+
+    inputFile.onError = (error) => {
+      fail(new Error(`MP4 flattening failed: ${error}`))
+    }
+
+    outputFile.onError = (error) => {
+      fail(new Error(`Flat MP4 builder failed: ${error}`))
+    }
+
+    inputFile.onReady = (info) => {
+      try {
+        for (const trackInfo of info.tracks) {
+          const trak = inputFile.getTrackById(trackInfo.id)
+          const entry = trak?.mdia?.minf?.stbl?.stsd?.entries?.[0]
+
+          if (!entry) {
+            throw new Error(`Missing track description for track ${trackInfo.id}.`)
+          }
+
+          const options = {
+            id: trackInfo.id,
+            type: entry.type,
+            timescale: trackInfo.timescale,
+            width: trackInfo.video?.width || trackInfo.track_width || 0,
+            height: trackInfo.video?.height || trackInfo.track_height || 0,
+            hdlr: trackInfo.video ? "vide" : "soun",
+            language: normalizeLanguage(trackInfo.language),
+            description_boxes: cloneDescriptionBoxes(entry)
+          }
+
+          if (trackInfo.audio) {
+            options.channel_count = trackInfo.audio.channel_count
+            options.samplesize = trackInfo.audio.sample_size || 16
+            options.samplerate = trackInfo.audio.sample_rate << 16
+          }
+
+          const outputTrackId = outputFile.addTrack(options)
+          if (!outputTrackId) {
+            throw new Error(`Unable to create output track for ${trackInfo.id}.`)
+          }
+
+          trackMap.set(trackInfo.id, outputTrackId)
+          inputFile.setExtractionOptions(trackInfo.id, null, { nbSamples: 1000 })
+        }
+
+        inputFile.onSamples = (trackId, user, samples) => {
+          const outputTrackId = trackMap.get(trackId)
+          for (const sample of samples) {
+            outputFile.addSample(outputTrackId, sample.data, {
+              duration: sample.duration,
+              cts: sample.cts,
+              dts: sample.dts,
+              is_sync: sample.is_sync,
+              sample_description_index: sample.description_index + 1
+            })
+          }
+        }
+
+        inputFile.start()
+        inputFile.flush()
+
+        const stream = new MP4Box.DataStream()
+        outputFile.write(stream)
+        const flatBuffer = stream.buffer.slice(0, stream.position)
+        succeed(new Uint8Array(flatBuffer))
+      } catch (error) {
+        fail(error)
+      }
+    }
+
+    const buffer = mp4Bytes.buffer.slice(
+      mp4Bytes.byteOffset,
+      mp4Bytes.byteOffset + mp4Bytes.byteLength
+    )
+    buffer.fileStart = 0
+    inputFile.appendBuffer(buffer)
+    inputFile.flush()
+  })
+}
+
 async function downloadMergedHls(item) {
   const playlist = await resolveMediaPlaylist(item.url, item)
   const parts = await fetchSegmentsInOrder(playlist.segments, item)
-  const mp4Bytes = await transmuxTsPartsToMp4(parts)
-  const blob = new Blob([mp4Bytes], {
+  const fragmentedMp4Bytes = await transmuxTsPartsToMp4(parts)
+  const flatMp4Bytes = await flattenFragmentedMp4(fragmentedMp4Bytes)
+  const blob = new Blob([flatMp4Bytes], {
     type: "video/mp4"
   })
   const filename = withExtension(item.filename || guessFilename(item.url), "mp4")

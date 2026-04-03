@@ -7,4 +7,12 @@ This project vendors code from:
 - Version: `6.3.0`
 - License: Apache-2.0
 
-The vendored browser build is stored at `vendor/mux-mp4.js`.
+- `mp4box` by the GPAC project
+- Source: https://github.com/gpac/mp4box.js
+- Version: `2.3.0`
+- License: BSD-3-Clause
+
+The vendored browser builds are stored at:
+
+- `vendor/mux-mp4.js`
+- `vendor/mp4box.all.js`
