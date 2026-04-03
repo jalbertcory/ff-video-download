@@ -9,6 +9,7 @@ const MEDIA_TYPES = {
 
 const HLS_FETCH_CONCURRENCY = 6
 let mp4boxModulePromise = null
+const CONTEXT_MENU_ID = "download-best-detected-video"
 
 function sanitizeFilename(rawName) {
   const cleaned = (rawName || "video.mp4")
@@ -25,6 +26,38 @@ function stripKnownExtension(filename) {
 
 function withExtension(filename, extension) {
   return sanitizeFilename(`${stripKnownExtension(filename)}.${extension}`)
+}
+
+function normalizeSuggestedName(name) {
+  return stripKnownExtension(
+    String(name || "")
+      .replace(/[_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  )
+}
+
+function cleanTitleCandidate(title) {
+  const raw = String(title || "").trim()
+  if (!raw) {
+    return ""
+  }
+
+  const parts = raw.split(/\s[|:-]\s/)
+  return normalizeSuggestedName(parts[0] || raw)
+}
+
+function looksOpaqueName(name) {
+  const value = stripKnownExtension(name).toLowerCase()
+  if (!value || value.length < 4) {
+    return true
+  }
+
+  if (["video", "stream", "playlist", "master", "index", "source"].includes(value)) {
+    return true
+  }
+
+  return /^[a-z0-9_-]{10,}$/i.test(value)
 }
 
 function guessFilename(urlString) {
@@ -143,6 +176,134 @@ function clearTabMedia(tabId) {
 
 function getMediaForTab(tabId) {
   return (mediaByTab.get(tabId) || []).slice(0, 100)
+}
+
+function suggestOutputName(item, tabTitle = "") {
+  const pageBase = cleanTitleCandidate(tabTitle)
+  const detectedBase = normalizeSuggestedName(item.outputName || item.filename || guessFilename(item.url))
+
+  if (looksOpaqueName(detectedBase) && pageBase) {
+    return pageBase
+  }
+
+  return detectedBase || pageBase || "video"
+}
+
+function getResolutionScore(item) {
+  const haystack = `${item.filename} ${item.url}`
+  const resolution = haystack.match(/\b(2160|1440|1080|960|720|540|480|360|240)p\b/i)
+  if (resolution) {
+    return Number(resolution[1])
+  }
+
+  const dimensions = haystack.match(/\b(\d{3,4})x(\d{3,4})\b/i)
+  if (dimensions) {
+    return Math.max(Number(dimensions[1]), Number(dimensions[2]))
+  }
+
+  return 0
+}
+
+function getContextMenuScore(item, clickedUrl = "") {
+  const normalizedClickedUrl = String(clickedUrl || "")
+  let score = getResolutionScore(item) * 100000
+
+  if (item.mediaType === MEDIA_TYPES.MP4) {
+    score += 100000000
+  }
+
+  if (normalizedClickedUrl && item.url === normalizedClickedUrl) {
+    score += 1000000000
+  }
+
+  if (/master/i.test(item.url)) {
+    score -= 10000
+  }
+
+  score += item.lastSeen || 0
+  return score
+}
+
+function pickBestMediaForContext(tabId, clickedUrl = "") {
+  const media = getMediaForTab(tabId)
+  if (media.length === 0) {
+    return null
+  }
+
+  return [...media].sort((left, right) => {
+    return getContextMenuScore(right, clickedUrl) - getContextMenuScore(left, clickedUrl)
+  })[0]
+}
+
+function createMediaItemFromUrl(urlString, tabTitle = "", pageUrl = "") {
+  const mediaType = detectMediaType(urlString, "")
+  if (!mediaType) {
+    return null
+  }
+
+  return {
+    url: urlString,
+    mediaType,
+    filename: guessFilename(urlString),
+    outputName: suggestOutputName({
+      url: urlString,
+      filename: guessFilename(urlString)
+    }, tabTitle),
+    mimeType: "",
+    sources: ["context-menu"],
+    frameUrls: pageUrl ? [pageUrl] : []
+  }
+}
+
+async function downloadItem(item, tabTitle = "") {
+  const downloadItemWithName = {
+    ...item,
+    outputName: suggestOutputName(item, tabTitle)
+  }
+
+  if (downloadItemWithName.mediaType === MEDIA_TYPES.HLS) {
+    return downloadMergedHls(downloadItemWithName)
+  }
+
+  return downloadMedia(
+    downloadItemWithName.url,
+    withExtension(downloadItemWithName.outputName || downloadItemWithName.filename, "mp4")
+  )
+}
+
+async function handleContextMenuDownload(info, tab) {
+  const tabId = tab?.id
+  if (typeof tabId !== "number") {
+    return
+  }
+
+  const clickedUrl = info.srcUrl || info.linkUrl || ""
+  let item = null
+
+  if (clickedUrl && !clickedUrl.startsWith("blob:")) {
+    item = getMediaForTab(tabId).find((candidate) => candidate.url === clickedUrl) ||
+      createMediaItemFromUrl(clickedUrl, tab?.title || "", tab?.url || "")
+  }
+
+  if (!item) {
+    item = pickBestMediaForContext(tabId, clickedUrl)
+  }
+
+  if (!item) {
+    return
+  }
+
+  await downloadItem(item, tab?.title || "")
+}
+
+function ensureContextMenus() {
+  return browser.contextMenus.removeAll().catch(() => {}).then(() => {
+    browser.contextMenus.create({
+      id: CONTEXT_MENU_ID,
+      title: "Download best detected video",
+      contexts: ["video", "page"]
+    })
+  })
 }
 
 async function downloadMedia(url, filename) {
@@ -666,6 +827,22 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
 browser.tabs.onRemoved.addListener((tabId) => {
   clearTabMedia(tabId)
 })
+
+browser.runtime.onInstalled.addListener(() => {
+  ensureContextMenus()
+})
+
+browser.runtime.onStartup?.addListener(() => {
+  ensureContextMenus()
+})
+
+browser.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === CONTEXT_MENU_ID) {
+    handleContextMenuDownload(info, tab).catch(() => {})
+  }
+})
+
+ensureContextMenus()
 
 browser.runtime.onMessage.addListener((message, sender) => {
   if (message?.type === "register-media") {

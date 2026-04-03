@@ -2,11 +2,13 @@ const statusEl = document.getElementById("status")
 const mediaListEl = document.getElementById("media-list")
 const refreshButton = document.getElementById("refresh")
 const downloadAllButton = document.getElementById("download-all")
+const hideDuplicatesToggle = document.getElementById("hide-duplicates")
 const template = document.getElementById("media-item-template")
 
 let activeTabId = null
 let currentMedia = []
 let activeTabTitle = ""
+let hideDuplicateVariants = true
 
 function isHls(item) {
   return item.mediaType === "hls"
@@ -84,6 +86,130 @@ function getPrimaryExtension(item) {
   return ".mp4"
 }
 
+function getVariantLabel(item) {
+  const haystack = `${item.filename} ${item.url}`
+  const resolution = haystack.match(/\b(2160|1440|1080|960|720|540|480|360|240)p\b/i)
+  if (resolution) {
+    return `${resolution[1]}p`
+  }
+
+  const dimensions = haystack.match(/\b(\d{3,4})x(\d{3,4})\b/i)
+  if (dimensions) {
+    return `${dimensions[1]}x${dimensions[2]}`
+  }
+
+  if (/master/i.test(haystack)) {
+    return "master"
+  }
+
+  return ""
+}
+
+function getResolutionScore(item) {
+  const label = getVariantLabel(item)
+  const resolution = label.match(/^(\d{3,4})p$/)
+  if (resolution) {
+    return Number(resolution[1])
+  }
+
+  const dimensions = label.match(/^(\d{3,4})x(\d{3,4})$/)
+  if (dimensions) {
+    return Math.max(Number(dimensions[1]), Number(dimensions[2]))
+  }
+
+  return 0
+}
+
+function getDuplicateGroupKey(item) {
+  const pageBase = cleanTitleCandidate(activeTabTitle)
+  let candidate = normalizeSuggestedName(item.filename)
+
+  if (looksOpaqueName(candidate) && pageBase) {
+    candidate = pageBase
+  }
+
+  if (!candidate) {
+    try {
+      const pathnameStem = decodeURIComponent(new URL(item.url).pathname.split("/").pop() || "")
+      candidate = normalizeSuggestedName(pathnameStem)
+    } catch {
+      candidate = ""
+    }
+  }
+
+  const cleaned = candidate
+    .toLowerCase()
+    .replace(/\b(?:2160|1440|1080|960|720|540|480|360|240)p\b/g, " ")
+    .replace(/\b\d{3,4}x\d{3,4}\b/g, " ")
+    .replace(/\b(?:master|playlist|stream|index|video|audio|source|h264|x264|x265|hevc|avc1|aac|stereo|mono|high|medium|low)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  return `${item.mediaType}:${cleaned || pageBase.toLowerCase() || "video"}`
+}
+
+function getVariantScore(item) {
+  let score = getResolutionScore(item) * 100000
+
+  if (isMp4(item)) {
+    score += 100000000
+  }
+
+  if (/master/i.test(item.url)) {
+    score -= 10000
+  }
+
+  score += item.lastSeen || 0
+  return score
+}
+
+function getVisibleMedia(items = currentMedia) {
+  if (!hideDuplicateVariants) {
+    return {
+      media: items.map((item) => {
+        item.hiddenVariantCount = 0
+        return item
+      }),
+      hiddenVariantCount: 0
+    }
+  }
+
+  const grouped = new Map()
+
+  for (const item of items) {
+    const key = getDuplicateGroupKey(item)
+    const score = getVariantScore(item)
+    const existing = grouped.get(key)
+
+    if (!existing) {
+      grouped.set(key, {
+        best: item,
+        bestScore: score,
+        items: [item]
+      })
+      continue
+    }
+
+    existing.items.push(item)
+    if (score > existing.bestScore) {
+      existing.best = item
+      existing.bestScore = score
+    }
+  }
+
+  const media = Array.from(grouped.values())
+    .map((entry) => {
+      entry.best.hiddenVariantCount = Math.max(entry.items.length - 1, 0)
+      return entry.best
+    })
+    .sort((left, right) => getVariantScore(right) - getVariantScore(left))
+
+  return {
+    media,
+    hiddenVariantCount: items.length - media.length
+  }
+}
+
 function getChosenBaseName(item) {
   return normalizeSuggestedName(item.outputName) || normalizeSuggestedName(item.filename) || "video"
 }
@@ -109,7 +235,18 @@ function describeSources(item) {
     ? item.sources.join(", ")
     : "unknown"
 
-  return `Found via: ${sources}`
+  const details = [`Found via: ${sources}`]
+  const variantLabel = getVariantLabel(item)
+
+  if (variantLabel) {
+    details.push(`Variant: ${variantLabel}`)
+  }
+
+  if (item.hiddenVariantCount > 0) {
+    details.push(`${item.hiddenVariantCount} similar variant${item.hiddenVariantCount === 1 ? "" : "s"} hidden`)
+  }
+
+  return details.join(" • ")
 }
 
 function describeKind(item) {
@@ -137,7 +274,7 @@ function getStatusSummary() {
 }
 
 function getDownloadableMedia() {
-  return currentMedia.filter((item) => item.mediaType === "mp4")
+  return getVisibleMedia(currentMedia).media.filter((item) => item.mediaType === "mp4")
 }
 
 async function copyText(text) {
@@ -204,14 +341,16 @@ function renderMedia() {
     return
   }
 
+  const { media: visibleMedia, hiddenVariantCount } = getVisibleMedia(currentMedia)
   const downloadableMedia = getDownloadableMedia()
   downloadAllButton.disabled = downloadableMedia.length === 0
   downloadAllButton.textContent = downloadableMedia.length > 0
     ? `Download ${downloadableMedia.length === 1 ? "MP4" : "All MP4s"}`
     : "No MP4 Downloads"
-  setStatus(`${currentMedia.length} media URL${currentMedia.length === 1 ? "" : "s"} found: ${getStatusSummary()}.`)
+  const hiddenSummary = hiddenVariantCount > 0 ? ` ${hiddenVariantCount} duplicate variant${hiddenVariantCount === 1 ? "" : "s"} hidden.` : ""
+  setStatus(`${currentMedia.length} media URL${currentMedia.length === 1 ? "" : "s"} found: ${getStatusSummary()}.${hiddenSummary}`)
 
-  for (const item of currentMedia) {
+  for (const item of visibleMedia) {
     const fragment = template.content.cloneNode(true)
     const article = fragment.querySelector(".media-item")
     const nameInputEl = fragment.querySelector(".name-input")
@@ -326,6 +465,19 @@ function renderMedia() {
   }
 }
 
+async function loadSettings() {
+  try {
+    const stored = await browser.storage.local.get({
+      hideDuplicateVariants: true
+    })
+    hideDuplicateVariants = stored.hideDuplicateVariants !== false
+  } catch {
+    hideDuplicateVariants = true
+  }
+
+  hideDuplicatesToggle.checked = hideDuplicateVariants
+}
+
 refreshButton.addEventListener("click", async () => {
   refreshButton.disabled = true
   try {
@@ -367,6 +519,23 @@ downloadAllButton.addEventListener("click", async () => {
   }
 })
 
-loadMedia().catch((error) => {
+hideDuplicatesToggle.addEventListener("change", async () => {
+  hideDuplicateVariants = hideDuplicatesToggle.checked
+  try {
+    await browser.storage.local.set({
+      hideDuplicateVariants
+    })
+  } catch {
+    // Ignore storage failures and keep the in-memory setting.
+  }
+  renderMedia()
+})
+
+async function initializePopup() {
+  await loadSettings()
+  await loadMedia()
+}
+
+initializePopup().catch((error) => {
   setStatus(`Unable to scan this tab: ${error.message || "unknown error"}`)
 })

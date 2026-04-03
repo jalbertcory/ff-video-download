@@ -6,6 +6,7 @@
   "permissions": [
     "activeTab",
     "clipboardWrite",
+    "contextMenus",
     "cookies",
     "downloads",
     "storage",

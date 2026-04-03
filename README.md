@@ -28,6 +28,8 @@ See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THI
 - Watches real network responses for MP4 files and HLS playlists, which helps when a custom player hides the URL in the DOM.
 - Shows everything it found in the toolbar popup.
 - Suggests a cleaner save name from the page title when the detected stream filename is opaque, while still letting you edit the name before download.
+- Adds a right-click action so you can download the best detected video from the current tab without opening the popup.
+- Adds a duplicate-variant filter in the popup so signed CDN duplicates and similar variants are easier to sort through.
 - Downloads direct MP4 files one at a time or all at once.
 - Saves a small VLC helper `.m3u` file for HLS streams.
 - Exports an `ffmpeg` command for HLS URLs, including cookies from the browser when available.
@@ -49,9 +51,3 @@ See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THI
 3. Choose `{repo-directory}/ff-video-download/manifest.json`
 4. Visit a page with an embedded MP4 player
 5. Click the extension button and press **Download**
-
-## Next ideas
-
-- Add filename rules based on page title
-- Add a right-click download action for videos
-- Add filtering so duplicate CDN variants are easier to sort through
