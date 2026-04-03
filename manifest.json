@@ -17,6 +17,7 @@
   ],
   "background": {
     "scripts": [
+      "vendor/mux-mp4.js",
       "background.js"
     ],
     "preferred_environment": [

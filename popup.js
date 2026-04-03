@@ -150,9 +150,9 @@ function renderMedia() {
     metaEl.textContent = describeSources(item)
     helperButtonEl.textContent = isHls(item) ? "Save VLC Helper" : "Copy URL"
     commandButtonEl.classList.toggle("is-hidden", isMp4(item))
-    buttonEl.textContent = isHls(item) ? "Download TS Merge" : "Download MP4"
+    buttonEl.textContent = isHls(item) ? "Try MP4 Remux" : "Download MP4"
     buttonEl.title = isHls(item)
-      ? "Downloads simple non-DRM MPEG-TS HLS streams into one .ts transport-stream file."
+      ? "Attempts to remux simple non-DRM MPEG-TS HLS streams into an MP4 file."
       : ""
 
     helperButtonEl.addEventListener("click", async () => {
@@ -193,7 +193,7 @@ function renderMedia() {
 
     buttonEl.addEventListener("click", async () => {
       buttonEl.disabled = true
-      setStatus(isHls(item) ? `Downloading HLS transport stream for ${item.filename}…` : `Downloading ${item.filename}…`)
+      setStatus(isHls(item) ? `Attempting MP4 remux for ${item.filename}…` : `Downloading ${item.filename}…`)
 
       try {
         if (isHls(item)) {
@@ -202,7 +202,7 @@ function renderMedia() {
             mediaType: item.mediaType,
             item
           })
-          setStatus(`Downloaded ${response.segmentCount} HLS segment${response.segmentCount === 1 ? "" : "s"} into ${response.filename}. This is a TS container, so remux to MP4 if your player does not open TS files.`)
+          setStatus(`Remuxed ${response.segmentCount} HLS segment${response.segmentCount === 1 ? "" : "s"} into ${response.filename}. If a site uses a more complex playlist format, use the ffmpeg export instead.`)
         } else {
           await browser.runtime.sendMessage({
             type: "download-media",

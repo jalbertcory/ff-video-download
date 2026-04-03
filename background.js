@@ -1,3 +1,5 @@
+/* global muxjs */
+
 const mediaByTab = new Map()
 
 const MEDIA_TYPES = {
@@ -417,13 +419,70 @@ async function fetchSegmentsInOrder(segmentUrls, item) {
   return parts
 }
 
+function concatUint8Arrays(parts) {
+  const totalLength = parts.reduce((sum, part) => sum + part.byteLength, 0)
+  const combined = new Uint8Array(totalLength)
+  let offset = 0
+
+  for (const part of parts) {
+    combined.set(part, offset)
+    offset += part.byteLength
+  }
+
+  return combined
+}
+
+function transmuxTsPartsToMp4(parts) {
+  return new Promise((resolve, reject) => {
+    if (!globalThis.muxjs?.Transmuxer) {
+      reject(new Error("MP4 transmuxer is unavailable in this browser context."))
+      return
+    }
+
+    const transmuxer = new muxjs.Transmuxer({
+      keepOriginalTimestamps: false,
+      remux: true
+    })
+    const mp4Parts = []
+    let sawSegment = false
+
+    transmuxer.on("data", (segment) => {
+      sawSegment = true
+
+      if (mp4Parts.length === 0) {
+        mp4Parts.push(new Uint8Array(segment.initSegment))
+      }
+
+      mp4Parts.push(new Uint8Array(segment.data))
+    })
+
+    try {
+      for (const part of parts) {
+        transmuxer.push(new Uint8Array(part))
+        transmuxer.flush()
+      }
+    } catch (error) {
+      reject(error)
+      return
+    }
+
+    if (!sawSegment || mp4Parts.length === 0) {
+      reject(new Error("Unable to remux this HLS stream into MP4."))
+      return
+    }
+
+    resolve(concatUint8Arrays(mp4Parts))
+  })
+}
+
 async function downloadMergedHls(item) {
   const playlist = await resolveMediaPlaylist(item.url, item)
   const parts = await fetchSegmentsInOrder(playlist.segments, item)
-  const blob = new Blob(parts, {
-    type: "video/mp2t"
+  const mp4Bytes = await transmuxTsPartsToMp4(parts)
+  const blob = new Blob([mp4Bytes], {
+    type: "video/mp4"
   })
-  const filename = withExtension(item.filename || guessFilename(item.url), "ts")
+  const filename = withExtension(item.filename || guessFilename(item.url), "mp4")
   const downloadId = await createBlobDownload(blob, filename)
 
   return {

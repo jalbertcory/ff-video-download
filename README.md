@@ -4,7 +4,7 @@
 [![Firefox](https://img.shields.io/badge/browser-Firefox-f08a24.svg)](https://www.mozilla.org/firefox/)
 [![Manifest V3](https://img.shields.io/badge/webextension-MV3-1d2433.svg)](https://developer.mozilla.org/docs/Mozilla/Add-ons/WebExtensions)
 
-A small Firefox extension that finds direct `.mp4` video files and HLS `.m3u8` playlists on the current page so you can download MP4s, export VLC helpers, or save simple HLS streams as `.ts` files.
+A small Firefox extension that finds direct `.mp4` video files and HLS `.m3u8` playlists on the current page so you can download MP4s, export VLC helpers, or try simple HLS remuxing to `.mp4`.
 
 Firefox extension for grabbing direct embedded media URLs from ordinary web pages so you can watch them in a desktop player instead of a cramped browser video widget.
 
@@ -21,14 +21,14 @@ This project is licensed under the `0BSD` license, which is about as permissive 
 - Downloads direct MP4 files one at a time or all at once.
 - Saves a small VLC helper `.m3u` file for HLS streams.
 - Exports an `ffmpeg` command for HLS URLs, including cookies from the browser when available.
-- Attempts a basic in-extension HLS merge for simple non-DRM MPEG-TS playlists, producing a `.ts` transport-stream file.
+- Attempts a basic in-extension HLS remux for simple non-DRM MPEG-TS playlists, producing an MP4 download without re-encoding.
 
 ## What it does not do
 
 - It only targets direct MP4 files and HLS playlist URLs.
 - It does not turn HLS playlists into MP4 files inside Firefox.
-- The built-in HLS merge only supports straightforward non-DRM MPEG-TS segment playlists. It does not support encrypted HLS, byte-range playlists, or fMP4-style HLS with `#EXT-X-MAP`.
-- The merged HLS download is a `.ts` container. Many players can open it directly, but some will need a remux step such as `ffmpeg -i input.ts -c copy output.mp4`.
+- The built-in HLS remux only supports straightforward non-DRM MPEG-TS segment playlists. It does not support encrypted HLS, byte-range playlists, or fMP4-style HLS with `#EXT-X-MAP`.
+- The in-browser MP4 remux is best-effort. If a site uses a trickier stream layout, use the exported `ffmpeg` command instead.
 - It does not handle DRM, encrypted streams, `blob:` URLs themselves, or DASH (`.mpd`) manifests.
 - It is intentionally not built for large streaming sites or site-specific extraction logic.
 
