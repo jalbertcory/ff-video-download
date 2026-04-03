@@ -11,7 +11,7 @@
       <header class="hero">
         <p class="eyebrow">Firefox helper</p>
         <h1>Embedded MP4 Grabber</h1>
-        <p class="subtle">Find direct `.mp4` files on this tab and send them to Downloads.</p>
+        <p class="subtle">Find direct `.mp4` files and HLS `.m3u8` streams on this tab.</p>
       </header>
 
       <section class="actions">
@@ -28,10 +28,14 @@
       <article class="media-item">
         <div class="media-copy">
           <h2 class="filename"></h2>
+          <p class="kind"></p>
           <p class="url"></p>
           <p class="meta"></p>
         </div>
-        <button class="button primary download-one" type="button">Download</button>
+        <div class="item-actions">
+          <button class="button secondary copy-one" type="button">Copy URL</button>
+          <button class="button primary download-one" type="button">Download</button>
+        </div>
       </article>
     </template>
 

@@ -18,10 +18,22 @@ function guessFilename(urlString) {
   try {
     const url = new URL(urlString)
     const filename = decodeURIComponent(url.pathname.split("/").pop() || "")
-    return filename || "video.mp4"
+    return filename || "video"
   } catch {
-    return "video.mp4"
+    return "video"
   }
+}
+
+function detectMediaType(url) {
+  if (/\.mp4($|[?#])/i.test(url)) {
+    return "mp4"
+  }
+
+  if (/\.m3u8($|[?#])/i.test(url)) {
+    return "hls"
+  }
+
+  return null
 }
 
 function collectDomMedia() {
@@ -29,7 +41,8 @@ function collectDomMedia() {
 
   const addCandidate = (rawUrl, source) => {
     const url = normalizeUrl(rawUrl)
-    if (!url || !/\.mp4($|[?#])/i.test(url)) {
+    const mediaType = url ? detectMediaType(url) : null
+    if (!url || !mediaType) {
       return
     }
 
@@ -37,6 +50,7 @@ function collectDomMedia() {
       results.set(url, {
         url,
         filename: guessFilename(url),
+        mediaType,
         source
       })
     }

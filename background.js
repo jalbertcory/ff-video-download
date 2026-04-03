@@ -1,5 +1,10 @@
 const mediaByTab = new Map()
 
+const MEDIA_TYPES = {
+  MP4: "mp4",
+  HLS: "hls"
+}
+
 function sanitizeFilename(rawName) {
   const cleaned = (rawName || "video.mp4")
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
@@ -15,8 +20,11 @@ function guessFilename(urlString) {
     const pathname = url.pathname || ""
     const lastSegment = pathname.split("/").pop() || ""
     const decoded = decodeURIComponent(lastSegment)
-    const baseName = decoded || "video.mp4"
-    return sanitizeFilename(baseName.endsWith(".mp4") ? baseName : `${baseName}.mp4`)
+    const baseName = decoded || "video"
+    if (/\.(mp4|m3u8)($|[?#])/i.test(baseName)) {
+      return sanitizeFilename(baseName)
+    }
+    return sanitizeFilename(`${baseName}.mp4`)
   } catch {
     return "video.mp4"
   }
@@ -26,12 +34,53 @@ function isMp4Url(urlString) {
   return /\.mp4($|[?#])/i.test(urlString)
 }
 
-function isMp4ContentType(headers = []) {
-  return headers.some((header) => {
-    return header.name.toLowerCase() === "content-type" &&
-      header.value &&
-      header.value.toLowerCase().includes("video/mp4")
-  })
+function isHlsUrl(urlString) {
+  return /\.m3u8($|[?#])/i.test(urlString)
+}
+
+function getContentType(headers = []) {
+  return headers.find((header) => {
+    return header.name.toLowerCase() === "content-type" && header.value
+  })?.value || ""
+}
+
+function detectMediaType(urlString, mimeType = "") {
+  const normalizedMimeType = mimeType.toLowerCase()
+
+  if (isMp4Url(urlString) || normalizedMimeType.includes("video/mp4")) {
+    return MEDIA_TYPES.MP4
+  }
+
+  if (
+    isHlsUrl(urlString) ||
+    normalizedMimeType.includes("application/vnd.apple.mpegurl") ||
+    normalizedMimeType.includes("application/x-mpegurl")
+  ) {
+    return MEDIA_TYPES.HLS
+  }
+
+  return null
+}
+
+function normalizeMediaItem(incoming, normalizedUrl) {
+  const mediaType = incoming.mediaType || detectMediaType(normalizedUrl, incoming.mimeType || "")
+  if (!mediaType) {
+    return null
+  }
+
+  const preferredFilename = incoming.filename || guessFilename(normalizedUrl)
+  const defaultFilename = mediaType === MEDIA_TYPES.HLS ? "video.m3u8" : "video.mp4"
+
+  return {
+    url: normalizedUrl,
+    mediaType,
+    filename: sanitizeFilename(preferredFilename || defaultFilename),
+    mimeType: incoming.mimeType || "",
+    sources: [incoming.source || "unknown"],
+    frameUrls: incoming.frameUrl ? [incoming.frameUrl] : [],
+    firstSeen: Date.now(),
+    lastSeen: Date.now()
+  }
 }
 
 function upsertMedia(tabId, incoming) {
@@ -53,24 +102,22 @@ function upsertMedia(tabId, incoming) {
   const existing = mediaByTab.get(tabId) || []
   const normalizedUrl = parsedUrl.href
   const current = existing.find((item) => item.url === normalizedUrl)
+  const normalizedItem = normalizeMediaItem(incoming, normalizedUrl)
+
+  if (!normalizedItem) {
+    return
+  }
 
   if (current) {
     current.lastSeen = Date.now()
     current.sources = Array.from(new Set([...(current.sources || []), incoming.source || "unknown"]))
     current.frameUrls = Array.from(new Set([...(current.frameUrls || []), ...(incoming.frameUrl ? [incoming.frameUrl] : [])]))
     current.mimeType = current.mimeType || incoming.mimeType || ""
+    current.mediaType = current.mediaType || normalizedItem.mediaType
     return
   }
 
-  existing.push({
-    url: normalizedUrl,
-    filename: sanitizeFilename(incoming.filename || guessFilename(normalizedUrl)),
-    mimeType: incoming.mimeType || "",
-    sources: [incoming.source || "unknown"],
-    frameUrls: incoming.frameUrl ? [incoming.frameUrl] : [],
-    firstSeen: Date.now(),
-    lastSeen: Date.now()
-  })
+  existing.push(normalizedItem)
 
   existing.sort((a, b) => b.lastSeen - a.lastSeen)
   mediaByTab.set(tabId, existing)
@@ -97,14 +144,18 @@ browser.webRequest.onHeadersReceived.addListener(
       return
     }
 
-    if (!isMp4Url(details.url) && !isMp4ContentType(details.responseHeaders)) {
+    const mimeType = getContentType(details.responseHeaders)
+    const mediaType = detectMediaType(details.url, mimeType)
+
+    if (!mediaType) {
       return
     }
 
     upsertMedia(details.tabId, {
       url: details.url,
       filename: guessFilename(details.url),
-      mimeType: details.responseHeaders?.find((header) => header.name.toLowerCase() === "content-type")?.value || "",
+      mimeType,
+      mediaType,
       source: "network"
     })
   },

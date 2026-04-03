@@ -5,6 +5,7 @@
   "description": "Find direct MP4 video files embedded on the current page and download them.",
   "permissions": [
     "activeTab",
+    "clipboardWrite",
     "downloads",
     "storage",
     "tabs",

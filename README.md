@@ -4,9 +4,9 @@
 [![Firefox](https://img.shields.io/badge/browser-Firefox-f08a24.svg)](https://www.mozilla.org/firefox/)
 [![Manifest V3](https://img.shields.io/badge/webextension-MV3-1d2433.svg)](https://developer.mozilla.org/docs/Mozilla/Add-ons/WebExtensions)
 
-A small Firefox extension that finds direct `.mp4` video files on the current page and downloads them so you can open them in VLC or any other player.
+A small Firefox extension that finds direct `.mp4` video files and HLS `.m3u8` playlists on the current page so you can download them or open the stream URL in VLC.
 
-Firefox extension for grabbing direct embedded MP4 URLs from ordinary web pages so you can watch them in a desktop player instead of a cramped browser video widget.
+Firefox extension for grabbing direct embedded media URLs from ordinary web pages so you can watch them in a desktop player instead of a cramped browser video widget.
 
 ## License
 
@@ -15,14 +15,17 @@ This project is licensed under the `0BSD` license, which is about as permissive 
 ## What it does
 
 - Scans the page for direct MP4 sources in `<video>`, `<source>`, links, and common `data-*` attributes.
-- Watches real network responses for MP4 files, which helps when a custom player hides the URL in the DOM.
+- Detects HLS `.m3u8` playlists when a site uses a `blob:` video element backed by a real playlist URL.
+- Watches real network responses for MP4 files and HLS playlists, which helps when a custom player hides the URL in the DOM.
 - Shows everything it found in the toolbar popup.
 - Downloads one file at a time or all detected files at once.
+- Copies stream URLs so you can paste an HLS playlist directly into VLC with `Media -> Open Network Stream`.
 
 ## What it does not do
 
-- It only targets direct MP4 files.
-- It does not handle DRM, encrypted streams, `blob:` URLs, or segmented stream formats like HLS/DASH (`.m3u8`, `.mpd`).
+- It only targets direct MP4 files and HLS playlist URLs.
+- It does not turn HLS playlists into MP4 files inside Firefox.
+- It does not handle DRM, encrypted streams, `blob:` URLs themselves, or DASH (`.mpd`) manifests.
 - It is intentionally not built for large streaming sites or site-specific extraction logic.
 
 ## Load it in Firefox

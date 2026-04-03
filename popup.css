@@ -52,6 +52,7 @@ h1 {
 }
 
 .subtle,
+.kind,
 .meta,
 .url,
 .status {
@@ -134,6 +135,7 @@ h1 {
   word-break: break-word;
 }
 
+.kind,
 .url,
 .meta {
   margin: 0;
@@ -142,6 +144,17 @@ h1 {
   word-break: break-word;
 }
 
+.kind {
+  margin-bottom: 4px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
 .media-copy {
   min-width: 0;
+}
+
+.item-actions {
+  display: grid;
+  gap: 8px;
 }
