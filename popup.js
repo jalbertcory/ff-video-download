@@ -383,9 +383,13 @@ function renderMedia() {
   const { media: visibleMedia, hiddenVariantCount } = getVisibleMedia(currentMedia)
   const downloadableMedia = getDownloadableMedia()
   downloadAllButton.disabled = downloadableMedia.length === 0
-  downloadAllButton.textContent = downloadableMedia.length > 0
-    ? `Download ${downloadableMedia.length === 1 ? "MP4" : "All MP4s"}`
-    : "No MP4 Downloads"
+  if (downloadableMedia.length > 0) {
+    downloadAllButton.textContent = `Download ${downloadableMedia.length === 1 ? "MP4" : "All MP4s"}`
+  } else if (currentMedia.some((item) => item.mediaType === "hls")) {
+    downloadAllButton.textContent = "Use HLS Rows"
+  } else {
+    downloadAllButton.textContent = "No Downloads"
+  }
   const hiddenSummary = hiddenVariantCount > 0 ? ` ${hiddenVariantCount} duplicate variant${hiddenVariantCount === 1 ? "" : "s"} hidden.` : ""
   setStatus(`${currentMedia.length} media URL${currentMedia.length === 1 ? "" : "s"} found: ${getStatusSummary()}.${hiddenSummary}`)
 
@@ -533,7 +537,11 @@ downloadAllButton.addEventListener("click", async () => {
 
   const downloadableMedia = getDownloadableMedia()
   if (downloadableMedia.length === 0) {
-    setStatus("No direct MP4 files are available to download on this tab.")
+    if (currentMedia.some((item) => item.mediaType === "hls")) {
+      setStatus("This tab only has HLS playlists right now. Use the row actions to remux or export each stream.")
+    } else {
+      setStatus("No direct MP4 files are available to download on this tab.")
+    }
     return
   }
 
