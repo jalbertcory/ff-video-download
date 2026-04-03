@@ -138,6 +138,10 @@ async function downloadMedia(url, filename) {
   })
 }
 
+function getMediaForTab(tabId) {
+  return (mediaByTab.get(tabId) || []).slice(0, 100)
+}
+
 browser.webRequest.onHeadersReceived.addListener(
   (details) => {
     if (details.tabId < 0) {
@@ -188,11 +192,15 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
   if (message?.type === "get-media-for-tab") {
     return Promise.resolve({
-      media: (mediaByTab.get(message.tabId) || []).slice(0, 100)
+      media: getMediaForTab(message.tabId)
     })
   }
 
   if (message?.type === "download-media") {
+    if (message.mediaType === MEDIA_TYPES.HLS) {
+      return Promise.reject(new Error("HLS streams are playlists, not single MP4 files. Copy the URL into VLC instead."))
+    }
+
     return downloadMedia(message.url, message.filename).then((downloadId) => ({
       ok: true,
       downloadId
@@ -200,7 +208,12 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
 
   if (message?.type === "download-all-media") {
-    const media = mediaByTab.get(message.tabId) || []
+    const media = getMediaForTab(message.tabId).filter((item) => item.mediaType === MEDIA_TYPES.MP4)
+
+    if (media.length === 0) {
+      return Promise.reject(new Error("No direct MP4 files are available to download on this tab."))
+    }
+
     return Promise.all(media.map((item) => downloadMedia(item.url, item.filename))).then((downloadIds) => ({
       ok: true,
       downloadIds

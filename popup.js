@@ -55,6 +55,10 @@ function getStatusSummary() {
   return parts.join(" and ")
 }
 
+function getDownloadableMedia() {
+  return currentMedia.filter((item) => item.mediaType === "mp4")
+}
+
 async function copyText(text) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text)
@@ -117,7 +121,11 @@ function renderMedia() {
     return
   }
 
-  downloadAllButton.disabled = false
+  const downloadableMedia = getDownloadableMedia()
+  downloadAllButton.disabled = downloadableMedia.length === 0
+  downloadAllButton.textContent = downloadableMedia.length > 0
+    ? `Download ${downloadableMedia.length === 1 ? "MP4" : "All MP4s"}`
+    : "No MP4 Downloads"
   setStatus(`${currentMedia.length} media URL${currentMedia.length === 1 ? "" : "s"} found: ${getStatusSummary()}.`)
 
   for (const item of currentMedia) {
@@ -136,7 +144,9 @@ function renderMedia() {
     urlEl.title = item.url
     metaEl.textContent = describeSources(item)
     copyButtonEl.textContent = isHls(item) ? "Copy for VLC" : "Copy URL"
-    buttonEl.textContent = isHls(item) ? "Download .m3u8" : "Download"
+    buttonEl.textContent = isHls(item) ? "Use Copy for VLC" : "Download MP4"
+    buttonEl.disabled = isHls(item)
+    buttonEl.title = isHls(item) ? "HLS streams are playlists, not single MP4 files." : ""
 
     copyButtonEl.addEventListener("click", async () => {
       copyButtonEl.disabled = true
@@ -151,6 +161,11 @@ function renderMedia() {
     })
 
     buttonEl.addEventListener("click", async () => {
+      if (isHls(item)) {
+        setStatus("HLS streams should be copied into VLC instead of downloaded as a single file.")
+        return
+      }
+
       buttonEl.disabled = true
       setStatus(`Downloading ${item.filename}…`)
 
@@ -158,7 +173,8 @@ function renderMedia() {
         await browser.runtime.sendMessage({
           type: "download-media",
           url: item.url,
-          filename: item.filename
+          filename: item.filename,
+          mediaType: item.mediaType
         })
         setStatus(`Started download for ${item.filename}.`)
       } catch (error) {
@@ -186,15 +202,21 @@ downloadAllButton.addEventListener("click", async () => {
     return
   }
 
+  const downloadableMedia = getDownloadableMedia()
+  if (downloadableMedia.length === 0) {
+    setStatus("No direct MP4 files are available to download on this tab.")
+    return
+  }
+
   downloadAllButton.disabled = true
-  setStatus(`Starting ${currentMedia.length} download${currentMedia.length === 1 ? "" : "s"}…`)
+  setStatus(`Starting ${downloadableMedia.length} MP4 download${downloadableMedia.length === 1 ? "" : "s"}…`)
 
   try {
     await browser.runtime.sendMessage({
       type: "download-all-media",
       tabId: activeTabId
     })
-    setStatus(`Started ${currentMedia.length} download${currentMedia.length === 1 ? "" : "s"}.`)
+    setStatus(`Started ${downloadableMedia.length} MP4 download${downloadableMedia.length === 1 ? "" : "s"}.`)
   } catch (error) {
     setStatus(`Bulk download failed: ${error.message || "unknown error"}`)
   } finally {
