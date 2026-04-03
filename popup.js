@@ -6,6 +6,7 @@ const template = document.getElementById("media-item-template")
 
 let activeTabId = null
 let currentMedia = []
+let activeTabTitle = ""
 
 function isHls(item) {
   return item.mediaType === "hls"
@@ -13,6 +14,82 @@ function isHls(item) {
 
 function isMp4(item) {
   return item.mediaType === "mp4"
+}
+
+function stripKnownExtension(name) {
+  return String(name || "")
+    .replace(/\.(mp4|m3u8|ts|m3u)$/i, "")
+    .trim()
+}
+
+function normalizeSuggestedName(name) {
+  return stripKnownExtension(
+    String(name || "")
+      .replace(/[_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  )
+}
+
+function cleanTitleCandidate(title) {
+  const raw = String(title || "").trim()
+  if (!raw) {
+    return ""
+  }
+
+  const parts = raw.split(/\s[|:-]\s/)
+  const candidate = parts[0] || raw
+  return normalizeSuggestedName(candidate)
+}
+
+function looksOpaqueName(name) {
+  const value = stripKnownExtension(name).toLowerCase()
+  if (!value || value.length < 4) {
+    return true
+  }
+
+  if (["video", "stream", "playlist", "master", "index", "source"].includes(value)) {
+    return true
+  }
+
+  return /^[a-z0-9_-]{10,}$/i.test(value)
+}
+
+function buildSuggestedOutputNames(media, tabTitle, previousByUrl) {
+  const pageBase = cleanTitleCandidate(tabTitle)
+  const counts = new Map()
+
+  return media.map((item) => {
+    const previousName = normalizeSuggestedName(previousByUrl.get(item.url))
+    if (previousName) {
+      return {
+        ...item,
+        outputName: previousName
+      }
+    }
+
+    const detectedBase = normalizeSuggestedName(item.filename)
+    const baseName = looksOpaqueName(detectedBase) && pageBase ? pageBase : (detectedBase || pageBase || "video")
+    const count = (counts.get(baseName) || 0) + 1
+    counts.set(baseName, count)
+
+    return {
+      ...item,
+      outputName: count === 1 ? baseName : `${baseName} ${count}`
+    }
+  })
+}
+
+function getPrimaryExtension(item) {
+  return ".mp4"
+}
+
+function getChosenBaseName(item) {
+  return normalizeSuggestedName(item.outputName) || normalizeSuggestedName(item.filename) || "video"
+}
+
+function getOutputFilename(item, extension = "mp4") {
+  return `${getChosenBaseName(item)}.${extension}`
 }
 
 function truncateUrl(url) {
@@ -96,6 +173,7 @@ async function rescanTab(tabId) {
 async function loadMedia() {
   const tab = await getActiveTab()
   activeTabId = tab?.id ?? null
+  activeTabTitle = tab?.title || ""
 
   if (!activeTabId) {
     currentMedia = []
@@ -112,7 +190,8 @@ async function loadMedia() {
     tabId: activeTabId
   })
 
-  currentMedia = response.media || []
+  const previousByUrl = new Map(currentMedia.map((item) => [item.url, item.outputName]))
+  currentMedia = buildSuggestedOutputNames(response.media || [], activeTabTitle, previousByUrl)
   renderMedia()
 }
 
@@ -135,6 +214,8 @@ function renderMedia() {
   for (const item of currentMedia) {
     const fragment = template.content.cloneNode(true)
     const article = fragment.querySelector(".media-item")
+    const nameInputEl = fragment.querySelector(".name-input")
+    const nameExtensionEl = fragment.querySelector(".name-extension")
     const filenameEl = fragment.querySelector(".filename")
     const kindEl = fragment.querySelector(".kind")
     const urlEl = fragment.querySelector(".url")
@@ -143,7 +224,9 @@ function renderMedia() {
     const commandButtonEl = fragment.querySelector(".command-one")
     const buttonEl = fragment.querySelector(".download-one")
 
-    filenameEl.textContent = item.filename
+    nameInputEl.value = item.outputName
+    nameExtensionEl.textContent = getPrimaryExtension(item)
+    filenameEl.textContent = `Detected source name: ${item.filename}`
     kindEl.textContent = describeKind(item)
     urlEl.textContent = truncateUrl(item.url)
     urlEl.title = item.url
@@ -155,13 +238,26 @@ function renderMedia() {
       ? "Attempts to remux simple non-DRM MPEG-TS HLS streams into an MP4 file."
       : ""
 
+    nameInputEl.addEventListener("input", (event) => {
+      item.outputName = event.target.value
+    })
+
+    nameInputEl.addEventListener("blur", () => {
+      const normalized = getChosenBaseName(item)
+      item.outputName = normalized
+      nameInputEl.value = normalized
+    })
+
     helperButtonEl.addEventListener("click", async () => {
       helperButtonEl.disabled = true
       try {
         if (isHls(item)) {
           const response = await browser.runtime.sendMessage({
             type: "save-vlc-helper",
-            item
+            item: {
+              ...item,
+              outputName: getChosenBaseName(item)
+            }
           })
           setStatus(`Saved VLC helper playlist as ${response.filename}.`)
         } else {
@@ -180,7 +276,10 @@ function renderMedia() {
       try {
         const response = await browser.runtime.sendMessage({
           type: "build-ffmpeg-command",
-          item
+          item: {
+            ...item,
+            outputName: getChosenBaseName(item)
+          }
         })
         await copyText(response.command)
         setStatus("Copied ffmpeg command.")
@@ -200,18 +299,21 @@ function renderMedia() {
           const response = await browser.runtime.sendMessage({
             type: "download-media",
             mediaType: item.mediaType,
-            item
+            item: {
+              ...item,
+              outputName: getChosenBaseName(item)
+            }
           })
           setStatus(`Remuxed ${response.segmentCount} HLS segment${response.segmentCount === 1 ? "" : "s"} into ${response.filename}. If a site uses a more complex playlist format, use the ffmpeg export instead.`)
         } else {
           await browser.runtime.sendMessage({
             type: "download-media",
             url: item.url,
-            filename: item.filename,
+            filename: getOutputFilename(item),
             mediaType: item.mediaType,
             item
           })
-          setStatus(`Started download for ${item.filename}.`)
+          setStatus(`Started download for ${getOutputFilename(item)}.`)
         }
       } catch (error) {
         setStatus(`Download failed: ${error.message || "unknown error"}`)
@@ -248,10 +350,15 @@ downloadAllButton.addEventListener("click", async () => {
   setStatus(`Starting ${downloadableMedia.length} MP4 download${downloadableMedia.length === 1 ? "" : "s"}…`)
 
   try {
-    await browser.runtime.sendMessage({
-      type: "download-all-media",
-      tabId: activeTabId
-    })
+    for (const item of downloadableMedia) {
+      await browser.runtime.sendMessage({
+        type: "download-media",
+        url: item.url,
+        filename: getOutputFilename(item),
+        mediaType: item.mediaType,
+        item
+      })
+    }
     setStatus(`Started ${downloadableMedia.length} MP4 download${downloadableMedia.length === 1 ? "" : "s"}.`)
   } catch (error) {
     setStatus(`Bulk download failed: ${error.message || "unknown error"}`)

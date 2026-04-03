@@ -27,6 +27,7 @@ See [LICENSE](/Users/jalbertcory/Documents/code/ff-video-download/LICENSE), [THI
 - Detects HLS `.m3u8` playlists when a site uses a `blob:` video element backed by a real playlist URL.
 - Watches real network responses for MP4 files and HLS playlists, which helps when a custom player hides the URL in the DOM.
 - Shows everything it found in the toolbar popup.
+- Suggests a cleaner save name from the page title when the detected stream filename is opaque, while still letting you edit the name before download.
 - Downloads direct MP4 files one at a time or all at once.
 - Saves a small VLC helper `.m3u` file for HLS streams.
 - Exports an `ffmpeg` command for HLS URLs, including cookies from the browser when available.

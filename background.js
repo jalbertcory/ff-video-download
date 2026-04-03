@@ -218,7 +218,7 @@ async function buildFfmpegCommand(item) {
     shellQuote(item.url),
     "-c",
     "copy",
-    shellQuote(withExtension(item.filename || guessFilename(item.url), "mp4"))
+    shellQuote(withExtension(item.outputName || item.filename || guessFilename(item.url), "mp4"))
   )
 
   return commandParts.join(" ")
@@ -602,7 +602,7 @@ async function downloadMergedHls(item) {
   const blob = new Blob([flatMp4Bytes], {
     type: "video/mp4"
   })
-  const filename = withExtension(item.filename || guessFilename(item.url), "mp4")
+  const filename = withExtension(item.outputName || item.filename || guessFilename(item.url), "mp4")
   const downloadId = await createBlobDownload(blob, filename)
 
   return {
@@ -613,7 +613,7 @@ async function downloadMergedHls(item) {
 }
 
 async function saveVlcHelper(item) {
-  const title = stripKnownExtension(item.filename || guessFilename(item.url)) || "Stream"
+  const title = stripKnownExtension(item.outputName || item.filename || guessFilename(item.url)) || "Stream"
   const helperContents = [
     "#EXTM3U",
     `#EXTINF:-1,${title}`,
@@ -623,7 +623,7 @@ async function saveVlcHelper(item) {
   const blob = new Blob([helperContents], {
     type: "audio/x-mpegurl"
   })
-  const filename = withExtension(item.filename || guessFilename(item.url), "m3u")
+  const filename = withExtension(item.outputName || item.filename || guessFilename(item.url), "m3u")
   const downloadId = await createBlobDownload(blob, filename)
 
   return {

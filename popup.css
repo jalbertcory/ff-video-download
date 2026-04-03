@@ -52,6 +52,7 @@ h1 {
 }
 
 .subtle,
+.name-label,
 .kind,
 .meta,
 .url,
@@ -133,12 +134,13 @@ h1 {
 }
 
 .filename {
-  margin: 0 0 6px;
-  font-size: 15px;
-  line-height: 1.25;
+  margin: 6px 0 6px;
+  font-size: 12px;
+  line-height: 1.35;
   word-break: break-word;
 }
 
+.name-label,
 .kind,
 .url,
 .meta {
@@ -152,6 +154,48 @@ h1 {
   margin-bottom: 4px;
   font-weight: 700;
   color: var(--primary);
+}
+
+.name-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+
+.name-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.name-input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.name-input:focus {
+  outline: 2px solid rgba(23, 98, 74, 0.25);
+  outline-offset: 1px;
+}
+
+.name-extension {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(23, 98, 74, 0.1);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .media-copy {

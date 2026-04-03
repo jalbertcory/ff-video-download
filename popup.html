@@ -27,7 +27,12 @@
     <template id="media-item-template">
       <article class="media-item">
         <div class="media-copy">
-          <h2 class="filename"></h2>
+          <label class="name-label">Save as</label>
+          <div class="name-row">
+            <input class="name-input" type="text" spellcheck="false">
+            <span class="name-extension">.mp4</span>
+          </div>
+          <p class="filename"></p>
           <p class="kind"></p>
           <p class="url"></p>
           <p class="meta"></p>
