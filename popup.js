@@ -33,6 +33,39 @@ function normalizeSuggestedName(name) {
   )
 }
 
+function getNormalizedPathSegments(urlString) {
+  try {
+    return new URL(urlString)
+      .pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => normalizeSuggestedName(decodeURIComponent(segment)))
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function getHlsAssetStem(item) {
+  if (!isHls(item)) {
+    return ""
+  }
+
+  const segments = getNormalizedPathSegments(item.url)
+  const last = segments.at(-1) || ""
+  const previous = segments.at(-2) || ""
+
+  if (/^\d{3,6}$/.test(last) && previous) {
+    return previous
+  }
+
+  if (["master", "index", "playlist", "stream"].includes(last) && previous) {
+    return previous
+  }
+
+  return last || previous || ""
+}
+
 function cleanTitleCandidate(title) {
   const raw = String(title || "").trim()
   if (!raw) {
@@ -70,14 +103,19 @@ function buildSuggestedOutputNames(media, tabTitle, previousByUrl) {
       }
     }
 
+    const derivedHlsBase = getHlsAssetStem(item)
     const detectedBase = normalizeSuggestedName(item.filename)
+    const structuralBase = derivedHlsBase || detectedBase
     const baseName = looksOpaqueName(detectedBase) && pageBase ? pageBase : (detectedBase || pageBase || "video")
-    const count = (counts.get(baseName) || 0) + 1
-    counts.set(baseName, count)
+    const finalBaseName = isHls(item) && structuralBase
+      ? (looksOpaqueName(structuralBase) && pageBase ? pageBase : structuralBase)
+      : baseName
+    const count = (counts.get(finalBaseName) || 0) + 1
+    counts.set(finalBaseName, count)
 
     return {
       ...item,
-      outputName: count === 1 ? baseName : `${baseName} ${count}`
+      outputName: count === 1 ? finalBaseName : `${finalBaseName} ${count}`
     }
   })
 }
@@ -122,7 +160,8 @@ function getResolutionScore(item) {
 
 function getDuplicateGroupKey(item) {
   const pageBase = cleanTitleCandidate(activeTabTitle)
-  let candidate = normalizeSuggestedName(item.filename)
+  const hlsAssetStem = getHlsAssetStem(item)
+  let candidate = hlsAssetStem || normalizeSuggestedName(item.filename)
 
   if (looksOpaqueName(candidate) && pageBase) {
     candidate = pageBase

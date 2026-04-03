@@ -37,6 +37,39 @@ function normalizeSuggestedName(name) {
   )
 }
 
+function getNormalizedPathSegments(urlString) {
+  try {
+    return new URL(urlString)
+      .pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => normalizeSuggestedName(decodeURIComponent(segment)))
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function getHlsAssetStem(item) {
+  if (item.mediaType !== MEDIA_TYPES.HLS) {
+    return ""
+  }
+
+  const segments = getNormalizedPathSegments(item.url)
+  const last = segments.at(-1) || ""
+  const previous = segments.at(-2) || ""
+
+  if (/^\d{3,6}$/.test(last) && previous) {
+    return previous
+  }
+
+  if (["master", "index", "playlist", "stream"].includes(last) && previous) {
+    return previous
+  }
+
+  return last || previous || ""
+}
+
 function cleanTitleCandidate(title) {
   const raw = String(title || "").trim()
   if (!raw) {
@@ -181,12 +214,13 @@ function getMediaForTab(tabId) {
 function suggestOutputName(item, tabTitle = "") {
   const pageBase = cleanTitleCandidate(tabTitle)
   const detectedBase = normalizeSuggestedName(item.outputName || item.filename || guessFilename(item.url))
+  const structuralBase = getHlsAssetStem(item) || detectedBase
 
-  if (looksOpaqueName(detectedBase) && pageBase) {
+  if (looksOpaqueName(structuralBase) && pageBase) {
     return pageBase
   }
 
-  return detectedBase || pageBase || "video"
+  return structuralBase || pageBase || "video"
 }
 
 function getResolutionScore(item) {
